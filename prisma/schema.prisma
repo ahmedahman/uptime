@@ -113,6 +113,16 @@ model BodyweightLog {
   createdAt DateTime @default(now())
 }
 
+model CalorieEntry {
+  id        String   @id @default(cuid())
+  date      String
+  slot      String // "breakfast" | "lunch" | "dinner" | "snack"
+  calories  Int
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
 model UserStats {
   id           String   @id @default("singleton")
   weightKg     Float    @default(61)

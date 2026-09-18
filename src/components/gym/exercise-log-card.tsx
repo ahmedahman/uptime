@@ -16,11 +16,15 @@ interface ExerciseLogCardProps {
 }
 
 export function ExerciseLogCard({ date, dayOfWeek, exercise, onSaved }: ExerciseLogCardProps) {
-  const { setCount, setLabels } = parseScheme(exercise.scheme);
+  const { setCount, setLabels, estimatedMinutes } = parseScheme(exercise.scheme);
   const [sets, setSets] = useState<SetInput[]>(() =>
     Array.from({ length: setCount }, (_, i) => {
       const existing = exercise.sets.find((s) => s.setIndex === i);
-      return { setIndex: i, weightKg: existing?.weightKg ?? null, reps: existing?.reps ?? null };
+      return {
+        setIndex: i,
+        weightKg: existing?.weightKg ?? exercise.lastSession?.topWeightKg ?? null,
+        reps: existing?.reps ?? null,
+      };
     }),
   );
   const [prIndexes, setPrIndexes] = useState<Set<number>>(
@@ -58,10 +62,18 @@ export function ExerciseLogCard({ date, dayOfWeek, exercise, onSaved }: Exercise
       <div className="flex items-start justify-between gap-3">
         <div>
           <CardHeading>{exercise.name}</CardHeading>
-          <p className="text-xs text-app-muted">{exercise.muscleGroup}</p>
+          <p className="text-xs text-app-muted">
+            {exercise.muscleGroup} · ~{estimatedMinutes} min
+          </p>
         </div>
         {saved && <span className="text-xs font-semibold text-accent-complete">Logged</span>}
       </div>
+
+      {exercise.lastSession && (
+        <p className="mt-2 text-xs text-accent-primary">
+          Last time: {exercise.lastSession.topWeightKg}kg × {exercise.lastSession.topReps}
+        </p>
+      )}
 
       {exercise.notes && <p className="mt-2 text-xs text-app-muted">{exercise.notes}</p>}
 
