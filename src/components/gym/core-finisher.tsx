@@ -9,14 +9,14 @@ import { cn } from "@/lib/utils/cn";
 interface CoreFinisherProps {
   date: string;
   options: string[];
-  initialLogged: boolean;
+  initialLogs: { exerciseName: string; reps: number | null }[];
   onLogged: () => void;
 }
 
-export function CoreFinisher({ date, options, initialLogged, onLogged }: CoreFinisherProps) {
-  const [picked, setPicked] = useState<string[]>([]);
-  const [reps, setReps] = useState<number | "">("");
-  const [logged, setLogged] = useState(initialLogged);
+export function CoreFinisher({ date, options, initialLogs, onLogged }: CoreFinisherProps) {
+  const [picked, setPicked] = useState<string[]>(() => initialLogs.map((l) => l.exerciseName));
+  const [reps, setReps] = useState<number | "">(() => initialLogs[0]?.reps ?? "");
+  const [logged, setLogged] = useState(initialLogs.length > 0);
   const [saving, setSaving] = useState(false);
 
   function togglePick(name: string) {

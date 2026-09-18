@@ -14,8 +14,8 @@ import type { SetInput } from "@/types";
 
 export function DaySections({ view }: { view: DayView }) {
   const [warmupDone, setWarmupDone] = useState(view.warmupCompleted);
-  const [skillDone, setSkillDone] = useState(view.skillLogged);
-  const [coreDone, setCoreDone] = useState(view.coreLogged);
+  const [skillDone, setSkillDone] = useState(view.skillLog != null);
+  const [coreDone, setCoreDone] = useState(view.coreLogs.length > 0);
   const [cardioDone, setCardioDone] = useState(view.cardioLogged);
   const [loggedExerciseIds, setLoggedExerciseIds] = useState<Set<string>>(
     () => new Set(view.exercises.filter((e) => e.sets.length > 0).map((e) => e.id)),
@@ -93,7 +93,7 @@ export function DaySections({ view }: { view: DayView }) {
         <SkillTracker
           date={view.date}
           skillName={view.skillName}
-          initialLogged={skillDone}
+          initialLog={view.skillLog}
           onLogged={() => {
             setSkillDone(true);
             checkComplete({
@@ -119,7 +119,7 @@ export function DaySections({ view }: { view: DayView }) {
       <CoreFinisher
         date={view.date}
         options={view.coreOptions}
-        initialLogged={coreDone}
+        initialLogs={view.coreLogs}
         onLogged={() => {
           setCoreDone(true);
           checkComplete({ warmupDone, skillDone, coreDone: true, loggedCount: loggedExerciseIds.size });

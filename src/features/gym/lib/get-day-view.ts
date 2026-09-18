@@ -20,8 +20,8 @@ export interface DayView {
   exercises: DayViewExercise[];
   coreOptions: string[];
   warmupCompleted: boolean;
-  skillLogged: boolean;
-  coreLogged: boolean;
+  skillLog: { attempts: number | null; holdSeconds: number | null } | null;
+  coreLogs: { exerciseName: string; reps: number | null }[];
   cardioLogged: boolean;
 }
 
@@ -57,7 +57,7 @@ export async function getDayView(date: string): Promise<DayView> {
       orderBy: { date: "desc" },
     }),
     prisma.warmupLog.findUnique({ where: { date } }),
-    prisma.skillLog.findMany({ where: { date } }),
+    prisma.skillLog.findMany({ where: { date }, orderBy: { createdAt: "desc" } }),
     prisma.coreLog.findMany({ where: { date } }),
     prisma.cardioLog.findMany({ where: { date } }),
   ]);
@@ -108,8 +108,10 @@ export async function getDayView(date: string): Promise<DayView> {
     exercises,
     coreOptions: CORE_ROTATION,
     warmupCompleted: warmup?.completed ?? false,
-    skillLogged: skillLogs.length > 0,
-    coreLogged: coreLogs.length > 0,
+    skillLog: skillLogs[0]
+      ? { attempts: skillLogs[0].attempts, holdSeconds: skillLogs[0].holdSeconds }
+      : null,
+    coreLogs: coreLogs.map((c) => ({ exerciseName: c.exerciseName, reps: c.reps })),
     cardioLogged: cardioLogs.length > 0,
   };
 }

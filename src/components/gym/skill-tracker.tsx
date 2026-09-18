@@ -9,14 +9,14 @@ import { SKILL_PROGRESSIONS, SKILL_FORMAT } from "@/lib/config/warmup";
 interface SkillTrackerProps {
   date: string;
   skillName: string;
-  initialLogged: boolean;
+  initialLog: { attempts: number | null; holdSeconds: number | null } | null;
   onLogged: () => void;
 }
 
-export function SkillTracker({ date, skillName, initialLogged, onLogged }: SkillTrackerProps) {
-  const [attempts, setAttempts] = useState<number | "">("");
-  const [holdSeconds, setHoldSeconds] = useState<number | "">("");
-  const [logged, setLogged] = useState(initialLogged);
+export function SkillTracker({ date, skillName, initialLog, onLogged }: SkillTrackerProps) {
+  const [attempts, setAttempts] = useState<number | "">(initialLog?.attempts ?? "");
+  const [holdSeconds, setHoldSeconds] = useState<number | "">(initialLog?.holdSeconds ?? "");
+  const [logged, setLogged] = useState(initialLog != null);
   const [saving, setSaving] = useState(false);
   const progressions = SKILL_PROGRESSIONS[skillName] ?? [];
 
