@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardHeading } from "@/components/ui/card";
 import { WARMUP_STEPS } from "@/lib/config/warmup";
 import { cn } from "@/lib/utils/cn";
+import { setWarmupCompleted } from "@/features/gym/lib/gym-store";
 
 interface WarmupChecklistProps {
   date: string;
@@ -13,22 +14,12 @@ interface WarmupChecklistProps {
 
 export function WarmupChecklist({ date, initialCompleted, onToggle }: WarmupChecklistProps) {
   const [completed, setCompleted] = useState(initialCompleted);
-  const [saving, setSaving] = useState(false);
 
-  async function toggle() {
+  function toggle() {
     const next = !completed;
     setCompleted(next);
-    setSaving(true);
-    try {
-      await fetch("/api/warmup-logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, completed: next }),
-      });
-      onToggle(next);
-    } finally {
-      setSaving(false);
-    }
+    setWarmupCompleted(date, next);
+    onToggle(next);
   }
 
   return (
@@ -37,7 +28,6 @@ export function WarmupChecklist({ date, initialCompleted, onToggle }: WarmupChec
         <CardHeading>Warm-up</CardHeading>
         <button
           onClick={toggle}
-          disabled={saving}
           className={cn(
             "h-6 w-6 shrink-0 rounded-full border-2 border-app-border transition-colors",
             completed && "border-accent-complete bg-accent-complete",

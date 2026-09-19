@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardHeading } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { userStatsSchema, type UserStatsInput, ACTIVITY_LEVELS } from "@/features/nutrition/lib/schema";
+import { saveUserStats } from "@/features/nutrition/lib/nutrition-store";
 
 interface StatsFormProps {
   initial: UserStatsInput;
@@ -36,12 +37,8 @@ export function StatsForm({ initial, onChange }: StatsFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function persist(values: UserStatsInput) {
-    await fetch("/api/user-stats", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
-    });
+  function persist(values: UserStatsInput) {
+    saveUserStats(values);
   }
 
   return (

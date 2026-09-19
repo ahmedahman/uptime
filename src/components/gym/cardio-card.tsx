@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardHeading } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { saveCardioLog } from "@/features/gym/lib/gym-store";
 
 const ACTIVITY_TYPES = ["Running", "Cycling", "Rowing"];
 
@@ -17,22 +18,12 @@ export function CardioCard({ date, initialLogged, onLogged }: CardioCardProps) {
   const [activityType, setActivityType] = useState(ACTIVITY_TYPES[0]);
   const [duration, setDuration] = useState<number | "">("");
   const [logged, setLogged] = useState(initialLogged);
-  const [saving, setSaving] = useState(false);
 
-  async function handleSave() {
+  function handleSave() {
     if (duration === "") return;
-    setSaving(true);
-    try {
-      await fetch("/api/cardio-logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, activityType, durationMinutes: duration }),
-      });
-      setLogged(true);
-      onLogged();
-    } finally {
-      setSaving(false);
-    }
+    saveCardioLog({ date, activityType, durationMinutes: duration });
+    setLogged(true);
+    onLogged();
   }
 
   return (
@@ -71,8 +62,8 @@ export function CardioCard({ date, initialLogged, onLogged }: CardioCardProps) {
         />
       </div>
 
-      <Button className="mt-4 w-full" variant="secondary" onClick={handleSave} disabled={saving}>
-        {saving ? "Saving…" : "Save"}
+      <Button className="mt-4 w-full" variant="secondary" onClick={handleSave}>
+        Save
       </Button>
     </Card>
   );

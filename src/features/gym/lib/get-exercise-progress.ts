@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma";
+import { findExercise } from "@/features/gym/lib/day-templates";
+import { getWorkoutLogs } from "@/features/gym/lib/gym-store";
 
 export interface ProgressPoint {
   date: string;
@@ -6,16 +7,14 @@ export interface ProgressPoint {
   topReps: number;
 }
 
-export async function getExerciseProgress(exerciseId: string, take = 6) {
-  const exercise = await prisma.exercise.findUnique({ where: { id: exerciseId } });
+export function getExerciseProgress(exerciseId: string, take = 6) {
+  const exercise = findExercise(exerciseId);
   if (!exercise) return null;
 
-  const logs = await prisma.workoutLog.findMany({
-    where: { exerciseId },
-    include: { sets: true },
-    orderBy: { date: "desc" },
-    take,
-  });
+  const logs = getWorkoutLogs()
+    .filter((l) => l.exerciseId === exerciseId)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .slice(0, take);
 
   const points: ProgressPoint[] = logs
     .map((log) => {
@@ -29,5 +28,5 @@ export async function getExerciseProgress(exerciseId: string, take = 6) {
     .filter((p): p is ProgressPoint => p !== null)
     .reverse();
 
-  return { exercise, points };
+  return { exercise: { id: exercise.slug, name: exercise.name, muscleGroup: exercise.muscleGroup }, points };
 }

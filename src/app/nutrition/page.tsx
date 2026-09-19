@@ -1,41 +1,46 @@
-import { prisma } from "@/lib/prisma";
+"use client";
+
+import { useEffect, useState } from "react";
 import { NutritionView } from "@/components/nutrition/nutrition-view";
 import { todayIso } from "@/lib/utils/date";
+import { getUserStats, getBodyweightLogs, getCalorieEntries } from "@/features/nutrition/lib/nutrition-store";
+import type { UserStatsInput } from "@/features/nutrition/lib/schema";
 
-export default async function NutritionPage() {
-  const date = todayIso();
-  const [stats, bodyweightLogs, calorieEntries] = await Promise.all([
-    prisma.userStats.upsert({
-      where: { id: "singleton" },
-      create: { id: "singleton" },
-      update: {},
-    }),
-    prisma.bodyweightLog.findMany({ orderBy: { date: "desc" }, take: 12 }),
-    prisma.calorieEntry.findMany({ where: { date }, orderBy: { createdAt: "asc" } }),
-  ]);
+interface InitialData {
+  stats: UserStatsInput;
+  bodyweightLogs: { date: string; weightKg: number }[];
+  calorieEntries: { slot: string; calories: number }[];
+}
+
+export default function NutritionPage() {
+  const [data, setData] = useState<InitialData | null>(null);
+
+  // One-time read of localStorage (client-only, non-reactive) on mount — not a sync loop.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setData({
+      stats: getUserStats(),
+      bodyweightLogs: getBodyweightLogs()
+        .sort((a, b) => (a.date < b.date ? -1 : 1))
+        .slice(-12),
+      calorieEntries: getCalorieEntries(todayIso()),
+    });
+  }, []);
 
   return (
     <div>
       <h1 className="font-display text-3xl font-black tracking-tight">Nutrition</h1>
       <p className="mt-1 text-sm text-app-muted">Bulk targets — log calories, no food tracking.</p>
 
-      <div className="mt-6">
-        <NutritionView
-          initialStats={{
-            weightKg: stats.weightKg,
-            heightCm: stats.heightCm,
-            age: stats.age,
-            activityMult: stats.activityMult,
-            proteinPerKg: stats.proteinPerKg,
-            surplusPct: stats.surplusPct,
-          }}
-          initialBodyweightLogs={bodyweightLogs.reverse().map((l) => ({
-            date: l.date,
-            weightKg: l.weightKg,
-          }))}
-          initialCalorieEntries={calorieEntries.map((e) => ({ slot: e.slot, calories: e.calories }))}
-        />
-      </div>
+      {data && (
+        <div className="mt-6">
+          <NutritionView
+            initialStats={data.stats}
+            initialBodyweightLogs={data.bodyweightLogs}
+            initialCalorieEntries={data.calorieEntries}
+          />
+        </div>
+      )}
     </div>
   );
 }

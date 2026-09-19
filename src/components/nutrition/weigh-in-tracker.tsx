@@ -7,6 +7,7 @@ import { Card, CardHeading } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { todayIso } from "@/lib/utils/date";
+import { saveBodyweightLog } from "@/features/nutrition/lib/nutrition-store";
 
 interface WeighInTrackerProps {
   initialLogs: { date: string; weightKg: number }[];
@@ -15,23 +16,13 @@ interface WeighInTrackerProps {
 export function WeighInTracker({ initialLogs }: WeighInTrackerProps) {
   const [logs, setLogs] = useState(initialLogs);
   const [weight, setWeight] = useState<number | "">("");
-  const [saving, setSaving] = useState(false);
 
-  async function handleSave() {
+  function handleSave() {
     if (weight === "") return;
-    setSaving(true);
-    try {
-      const date = todayIso();
-      await fetch("/api/bodyweight-logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, weightKg: weight }),
-      });
-      setLogs((prev) => [...prev.filter((l) => l.date !== date), { date, weightKg: weight }]);
-      setWeight("");
-    } finally {
-      setSaving(false);
-    }
+    const date = todayIso();
+    saveBodyweightLog({ date, weightKg: weight });
+    setLogs((prev) => [...prev.filter((l) => l.date !== date), { date, weightKg: weight }]);
+    setWeight("");
   }
 
   const data = logs.map((l) => ({ ...l, label: format(parseISO(l.date), "d MMM") }));
@@ -73,9 +64,7 @@ export function WeighInTracker({ initialLogs }: WeighInTrackerProps) {
           value={weight}
           onChange={(e) => setWeight(e.target.value === "" ? "" : Number(e.target.value))}
         />
-        <Button onClick={handleSave} disabled={saving}>
-          Log
-        </Button>
+        <Button onClick={handleSave}>Log</Button>
       </div>
     </Card>
   );

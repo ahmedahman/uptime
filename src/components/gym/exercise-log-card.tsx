@@ -5,6 +5,7 @@ import { Card, CardHeading } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SetRow } from "@/components/gym/set-row";
 import { parseScheme } from "@/features/gym/lib/parse-scheme";
+import { saveWorkoutLog } from "@/features/gym/lib/gym-store";
 import type { SetInput } from "@/types";
 import type { DayViewExercise } from "@/features/gym/lib/get-day-view";
 
@@ -30,31 +31,16 @@ export function ExerciseLogCard({ date, dayOfWeek, exercise, onSaved }: Exercise
   const [prIndexes, setPrIndexes] = useState<Set<number>>(
     () => new Set(exercise.sets.filter((s) => s.isPr).map((s) => s.setIndex)),
   );
-  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(exercise.sets.length > 0);
 
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/workout-logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, dayOfWeek, exerciseId: exercise.id, sets }),
-      });
-      const data = await res.json();
-      const newPrIndexes = new Set<number>(
-        (data.sets as { setIndex: number; isPr: boolean }[])
-          .filter((s) => s.isPr)
-          .map((s) => s.setIndex),
-      );
-      setPrIndexes(newPrIndexes);
-      setSaved(true);
+  function handleSave() {
+    const log = saveWorkoutLog(date, dayOfWeek, exercise.id, sets);
+    const newPrIndexes = new Set<number>(log.sets.filter((s) => s.isPr).map((s) => s.setIndex));
+    setPrIndexes(newPrIndexes);
+    setSaved(true);
 
-      const prSets = sets.filter((s) => newPrIndexes.has(s.setIndex));
-      onSaved(exercise.name, prSets);
-    } finally {
-      setSaving(false);
-    }
+    const prSets = sets.filter((s) => newPrIndexes.has(s.setIndex));
+    onSaved(exercise.name, prSets);
   }
 
   return (
@@ -89,8 +75,8 @@ export function ExerciseLogCard({ date, dayOfWeek, exercise, onSaved }: Exercise
         ))}
       </div>
 
-      <Button className="mt-4 w-full" variant="secondary" onClick={handleSave} disabled={saving}>
-        {saving ? "Saving…" : "Save"}
+      <Button className="mt-4 w-full" variant="secondary" onClick={handleSave}>
+        Save
       </Button>
     </Card>
   );

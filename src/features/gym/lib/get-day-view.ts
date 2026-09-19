@@ -1,5 +1,13 @@
-import { prisma } from "@/lib/prisma";
 import { dayOfWeekFromIso } from "@/lib/utils/date";
+import { findDayTemplate, findExercise } from "@/features/gym/lib/day-templates";
+import {
+  getWorkoutLogs,
+  getSkillLogs,
+  getCoreLogs,
+  getCardioLogs,
+  isWarmupCompleted,
+} from "@/features/gym/lib/gym-store";
+import type { DayType } from "@/types";
 
 export interface DayViewExercise {
   id: string;
@@ -15,7 +23,7 @@ export interface DayView {
   date: string;
   dayOfWeek: number;
   dayName: string;
-  type: "LIFT" | "REST" | "CARDIO";
+  type: DayType;
   skillName: string | null;
   exercises: DayViewExercise[];
   coreOptions: string[];
@@ -25,93 +33,80 @@ export interface DayView {
   cardioLogged: boolean;
 }
 
-const CORE_ROTATION = ["Hanging leg raise", "Cable crunch", "Plank", "Weighted sit-up"];
+function schemeFor(count: number, kind: "heavy-failure-backoff" | "straight", repRange?: string) {
+  return kind === "heavy-failure-backoff" ? `heavy-failure-backoff:${count}` : `straight:${count}x${repRange}`;
+}
 
-export async function getDayView(date: string): Promise<DayView> {
+export function getDayView(date: string): DayView {
   const dayOfWeek = dayOfWeekFromIso(date);
-
-  const template = await prisma.dayTemplate.findUnique({
-    where: { dayOfWeek },
-    include: {
-      exercises: {
-        orderBy: { order: "asc" },
-        include: { exercise: true },
-      },
-    },
-  });
+  const template = findDayTemplate(dayOfWeek);
 
   if (!template) {
     throw new Error(`No day template configured for dayOfWeek ${dayOfWeek}`);
   }
 
-  const exerciseIds = template.exercises.map((e) => e.exerciseId);
+  const allWorkoutLogs = getWorkoutLogs();
+  const priorLogs = allWorkoutLogs.filter((l) => l.date < date);
 
-  const [logs, priorLogs, warmup, skillLogs, coreLogs, cardioLogs] = await Promise.all([
-    prisma.workoutLog.findMany({
-      where: { date, exerciseId: { in: exerciseIds } },
-      include: { sets: { orderBy: { setIndex: "asc" } } },
-    }),
-    prisma.workoutLog.findMany({
-      where: { exerciseId: { in: exerciseIds }, date: { lt: date } },
-      include: { sets: true },
-      orderBy: { date: "desc" },
-    }),
-    prisma.warmupLog.findUnique({ where: { date } }),
-    prisma.skillLog.findMany({ where: { date }, orderBy: { createdAt: "desc" } }),
-    prisma.coreLog.findMany({ where: { date } }),
-    prisma.cardioLog.findMany({ where: { date } }),
-  ]);
-
-  const logByExerciseId = new Map(logs.map((l) => [l.exerciseId, l]));
-
-  // priorLogs is ordered most-recent-first, so the first log seen per exercise is its last session.
+  // priorLogs isn't ordered, so track the most recent date seen per exercise.
   const lastSessionByExerciseId = new Map<
     string,
     { date: string; topWeightKg: number; topReps: number }
   >();
   for (const log of priorLogs) {
-    if (lastSessionByExerciseId.has(log.exerciseId)) continue;
     const withWeight = log.sets.filter((s) => s.weightKg != null);
     if (withWeight.length === 0) continue;
     const top = withWeight.reduce((best, s) => ((s.weightKg ?? 0) > (best.weightKg ?? 0) ? s : best));
-    lastSessionByExerciseId.set(log.exerciseId, {
-      date: log.date,
-      topWeightKg: top.weightKg ?? 0,
-      topReps: top.reps ?? 0,
-    });
+    const existing = lastSessionByExerciseId.get(log.exerciseId);
+    if (!existing || log.date > existing.date) {
+      lastSessionByExerciseId.set(log.exerciseId, {
+        date: log.date,
+        topWeightKg: top.weightKg ?? 0,
+        topReps: top.reps ?? 0,
+      });
+    }
   }
 
-  const exercises: DayViewExercise[] = template.exercises.map((te) => {
-    const log = logByExerciseId.get(te.exerciseId);
+  const exercises: DayViewExercise[] = template.exercises.map((dayExercise) => {
+    const exercise = findExercise(dayExercise.exerciseSlug);
+    if (!exercise) throw new Error(`Unknown exercise slug: ${dayExercise.exerciseSlug}`);
+
+    const scheme =
+      dayExercise.scheme.kind === "heavy-failure-backoff"
+        ? schemeFor(dayExercise.scheme.count, "heavy-failure-backoff")
+        : schemeFor(dayExercise.scheme.count, "straight", dayExercise.scheme.repRange);
+
+    const log = allWorkoutLogs.find((l) => l.date === date && l.exerciseId === exercise.slug);
+
     return {
-      id: te.exercise.id,
-      name: te.exercise.name,
-      muscleGroup: te.exercise.muscleGroup,
-      notes: te.exercise.notes,
-      scheme: te.scheme,
-      sets: log?.sets.map((s) => ({
-        setIndex: s.setIndex,
-        weightKg: s.weightKg,
-        reps: s.reps,
-        isPr: s.isPr,
-      })) ?? [],
-      lastSession: lastSessionByExerciseId.get(te.exerciseId) ?? null,
+      id: exercise.slug,
+      name: exercise.name,
+      muscleGroup: exercise.muscleGroup,
+      notes: exercise.notes ?? null,
+      scheme,
+      sets: log?.sets ?? [],
+      lastSession: lastSessionByExerciseId.get(exercise.slug) ?? null,
     };
   });
+
+  const skillLogsToday = getSkillLogs().filter((l) => l.date === date);
+  const skillLog = template.skillName
+    ? skillLogsToday.find((l) => l.skillName === template.skillName) ?? null
+    : null;
 
   return {
     date,
     dayOfWeek,
     dayName: template.dayName,
     type: template.type,
-    skillName: template.skillName,
+    skillName: template.skillName ?? null,
     exercises,
-    coreOptions: CORE_ROTATION,
-    warmupCompleted: warmup?.completed ?? false,
-    skillLog: skillLogs[0]
-      ? { attempts: skillLogs[0].attempts, holdSeconds: skillLogs[0].holdSeconds }
-      : null,
-    coreLogs: coreLogs.map((c) => ({ exerciseName: c.exerciseName, reps: c.reps })),
-    cardioLogged: cardioLogs.length > 0,
+    coreOptions: template.coreOptions ?? [],
+    warmupCompleted: isWarmupCompleted(date),
+    skillLog: skillLog ? { attempts: skillLog.attempts, holdSeconds: skillLog.holdSeconds } : null,
+    coreLogs: getCoreLogs()
+      .filter((l) => l.date === date)
+      .map((l) => ({ exerciseName: l.exerciseName, reps: l.reps })),
+    cardioLogged: getCardioLogs().some((l) => l.date === date),
   };
 }

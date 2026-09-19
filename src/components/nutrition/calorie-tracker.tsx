@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { getDailyCalorieStatus, type MealSlot } from "@/features/nutrition/lib/checkpoints";
 import { todayIso } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
+import { addCalorieEntry } from "@/features/nutrition/lib/nutrition-store";
 
 const SLOT_LABEL: Record<MealSlot, string> = {
   breakfast: "Breakfast",
@@ -32,23 +33,13 @@ export function CalorieTracker({ dailyTarget, initialEntries }: CalorieTrackerPr
     dinner: "",
   });
   const [snackDraft, setSnackDraft] = useState<number | "">("");
-  const [saving, setSaving] = useState<string | null>(null);
 
   const status = getDailyCalorieStatus(dailyTarget, entries);
 
-  async function logEntry(slot: MealSlot | "snack", calories: number) {
-    setSaving(slot);
-    try {
-      const date = todayIso();
-      await fetch("/api/calorie-entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, slot, calories }),
-      });
-      setEntries((prev) => [...prev, { slot, calories }]);
-    } finally {
-      setSaving(null);
-    }
+  function logEntry(slot: MealSlot | "snack", calories: number) {
+    const date = todayIso();
+    addCalorieEntry({ date, slot, calories });
+    setEntries((prev) => [...prev, { slot, calories }]);
   }
 
   return (
@@ -85,7 +76,7 @@ export function CalorieTracker({ dailyTarget, initialEntries }: CalorieTrackerPr
               />
               <Button
                 variant="secondary"
-                disabled={saving === checkpoint.slot || drafts[checkpoint.slot] === ""}
+                disabled={drafts[checkpoint.slot] === ""}
                 onClick={() => {
                   const value = drafts[checkpoint.slot];
                   if (value === "") return;
@@ -125,7 +116,7 @@ export function CalorieTracker({ dailyTarget, initialEntries }: CalorieTrackerPr
           />
           <Button
             variant="secondary"
-            disabled={saving === "snack" || snackDraft === ""}
+            disabled={snackDraft === ""}
             onClick={() => {
               if (snackDraft === "") return;
               logEntry("snack", snackDraft);

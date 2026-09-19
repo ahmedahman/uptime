@@ -5,6 +5,7 @@ import { Card, CardHeading } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils/cn";
+import { saveCoreLogs } from "@/features/gym/lib/gym-store";
 
 interface CoreFinisherProps {
   date: string;
@@ -17,7 +18,6 @@ export function CoreFinisher({ date, options, initialLogs, onLogged }: CoreFinis
   const [picked, setPicked] = useState<string[]>(() => initialLogs.map((l) => l.exerciseName));
   const [reps, setReps] = useState<number | "">(() => initialLogs[0]?.reps ?? "");
   const [logged, setLogged] = useState(initialLogs.length > 0);
-  const [saving, setSaving] = useState(false);
 
   function togglePick(name: string) {
     setPicked((prev) =>
@@ -25,24 +25,14 @@ export function CoreFinisher({ date, options, initialLogs, onLogged }: CoreFinis
     );
   }
 
-  async function handleSave() {
+  function handleSave() {
     if (picked.length === 0) return;
-    setSaving(true);
-    try {
-      await Promise.all(
-        picked.map((exerciseName) =>
-          fetch("/api/core-logs", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ date, exerciseName, reps: reps === "" ? null : reps }),
-          }),
-        ),
-      );
-      setLogged(true);
-      onLogged();
-    } finally {
-      setSaving(false);
-    }
+    saveCoreLogs(
+      date,
+      picked.map((exerciseName) => ({ date, exerciseName, reps: reps === "" ? null : reps })),
+    );
+    setLogged(true);
+    onLogged();
   }
 
   return (
@@ -82,9 +72,9 @@ export function CoreFinisher({ date, options, initialLogs, onLogged }: CoreFinis
         className="mt-4 w-full"
         variant="secondary"
         onClick={handleSave}
-        disabled={saving || picked.length === 0}
+        disabled={picked.length === 0}
       >
-        {saving ? "Saving…" : "Save"}
+        Save
       </Button>
     </Card>
   );
